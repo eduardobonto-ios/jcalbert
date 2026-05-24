@@ -14,10 +14,15 @@ dotenv.config({ path: '.env.local', override: true });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Supabase client
-const supabaseUrl = process.env.SUPABASE_URL || 'https://qaepuswhpptcasriieps.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+// Read env vars AFTER dotenv.config() so .env values are loaded.
+// supabaseConfig.ts constants are evaluated at import-time (before dotenv runs),
+// so we read process.env directly here to pick up the service role key.
+const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://qaepuswhpptcasriieps.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhZXB1c3docHB0Y2FzcmlpZXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTA5NTcsImV4cCI6MjA4OTEyNjk1N30.9CuuxupRvvdV7MOY5lCfy9UtdVJtZwxFqbxsGNPM54g',
+);
 
 async function startServer() {
   const app = express();
@@ -55,7 +60,8 @@ async function startServer() {
         });
       }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
+        .schema('jcalbert')
         .from('messaging')
         .insert([
           {
@@ -66,6 +72,9 @@ async function startServer() {
             created_at: new Date().toISOString(),
           },
         ]);
+
+      console.log('data:', data);
+      console.log('error:', error);
 
       if (error) {
         console.error('Supabase messaging insertion error:', error);
@@ -101,21 +110,35 @@ async function startServer() {
     try {
       const [toursResult, imagesResult, highlightsResult, activitiesResult] = await Promise.all([
         supabase
+          .schema('jcalbert')
           .from('tours')
-          .select('id, name, location, description, price, original_price, is_best_seller'),
+          .select('*')
+          .order('created_at', { ascending: false }),
         supabase
+          .schema('jcalbert')
           .from('tour_images')
           .select('tour_id, image_url, label, sort_order')
           .order('sort_order', { ascending: true }),
         supabase
+          .schema('jcalbert')
           .from('tour_highlights')
           .select('tour_id, highlight, sort_order')
           .order('sort_order', { ascending: true }),
         supabase
+          .schema('jcalbert')
           .from('tour_activities')
           .select('tour_id, activity, sort_order')
           .order('sort_order', { ascending: true }),
       ]);
+
+      console.log('data:', toursResult.data);
+      console.log('error:', toursResult.error);
+      console.log('data:', imagesResult.data);
+      console.log('error:', imagesResult.error);
+      console.log('data:', highlightsResult.data);
+      console.log('error:', highlightsResult.error);
+      console.log('data:', activitiesResult.data);
+      console.log('error:', activitiesResult.error);
 
       const error =
         toursResult.error ||
@@ -155,19 +178,66 @@ async function startServer() {
     }
   });
 
+  app.get('/api/locations', async (_req, res) => {
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
+    }
+
+    try {
+      const { data, error } = await supabase
+        .schema('jcalbert')
+        .from('location')
+        .select('location_name')
+        .order('location_name', { ascending: true });
+
+      console.log('data:', data);
+      console.log('error:', error);
+
+      if (error) {
+        console.error('Supabase locations query error:', error);
+        return res.status(500).json({
+          success: false,
+          error:
+            process.env.NODE_ENV === 'production'
+              ? 'We could not load destinations right now. Please try again.'
+              : error.message,
+        });
+      }
+
+      return res.json({
+        success: true,
+        locations: (data ?? []).map((location) => location.location_name).filter(Boolean),
+      });
+    } catch (error) {
+      console.error('Unexpected /api/locations error:', error);
+      return res.status(500).json({
+        success: false,
+        error:
+          process.env.NODE_ENV === 'production'
+            ? 'We could not load destinations right now. Please try again.'
+            : error instanceof Error
+              ? error.message
+              : 'Server error',
+      });
+    }
+  });
+
   // API Route for Booking
   app.post('/api/book', async (req, res) => {
-    const { bookingData } = req.body;
-    const { 
-      bookingNumber, 
-      mainTour, 
-      additionalTours, 
-      customer, 
-      guestList,
+    const { bookingData } = req.body || {};
+    if (!bookingData) {
+      return res.status(400).json({ success: false, error: 'bookingData is required' });
+    }
+    const {
+      bookingNumber,
+      mainTour,
+      additionalTours = [],
+      customer = {},
+      guestList = [],
       totalGuests,
       accommodation,
       flightDetails,
-      searchParams, 
+      searchParams,
       totalPrice,
       reservationFee
     } = bookingData;
@@ -176,17 +246,22 @@ async function startServer() {
       // Send to Supabase
       if (supabase) {
         // Extract the numeric part from 'JCA-12345678'
-        const numericBookingId = parseInt(bookingNumber.split('-')[1]);
+        const numericBookingId = parseInt((bookingNumber || '').split('-')[1] || '0', 10) || Date.now();
         
-        const { error: supabaseError } = await supabase
+        const { data, error: supabaseError } = await supabase
+          .schema('jcalbert')
           .from('sales_report')
           .insert([
-            { 
+            {
               booking_id: numericBookingId,
               reservation_fee: reservationFee,
+              total_amount: totalPrice,
               created_at: new Date().toISOString()
             }
           ]);
+
+        console.log('data:', data);
+        console.log('error:', supabaseError);
         
         if (supabaseError) {
           console.error('Supabase insertion error:', supabaseError);

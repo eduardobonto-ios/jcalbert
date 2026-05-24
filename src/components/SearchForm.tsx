@@ -8,13 +8,17 @@ interface SearchFormProps {
   onParamsChange?: (params: SearchParams) => void;
   externalError?: string | null;
   initialDestination?: DestinationOrEmpty;
+  destinations?: Destination[];
+  isLocationsLoading?: boolean;
 }
 
-export const SearchForm: React.FC<SearchFormProps> = ({ 
-  onSearch, 
-  onParamsChange, 
+export const SearchForm: React.FC<SearchFormProps> = ({
+  onSearch,
+  onParamsChange,
   externalError,
-  initialDestination = ''
+  initialDestination = '',
+  destinations = [],
+  isLocationsLoading = false,
 }) => {
   const [destination, setDestination] = useState<DestinationOrEmpty>(initialDestination);
   const [checkIn, setCheckIn] = useState('');
@@ -95,7 +99,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
 
   return (
     <form 
-      className="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-xl p-2 md:p-1 border-4 border-[#F9B31C] -mt-8 relative z-10"
+      className="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-xl p-2 md:p-1 border-4 border-[#1F91C7] -mt-8 relative z-10"
     >
       {displayError && (
         <div className="bg-red-500 text-white text-[10px] py-1 px-4 font-bold text-center uppercase tracking-widest">
@@ -116,11 +120,18 @@ export const SearchForm: React.FC<SearchFormProps> = ({
                 !destination ? "text-gray-400" : "text-gray-800"
               )}
             >
-              <option value="" disabled>Select Destination</option>
-              <option value="El Nido">El Nido</option>
-              <option value="Coron">Coron</option>
-              <option value="Puerto Princesa">Puerto Princesa</option>
-              <option value="Port Barton">Port Barton</option>
+              <option value="" disabled>
+                {isLocationsLoading
+                  ? 'Loading destinations...'
+                  : destinations.length
+                  ? 'Select Destination'
+                  : 'No destinations available'}
+              </option>
+              {destinations.map((destinationName) => (
+                <option key={destinationName} value={destinationName}>
+                  {destinationName}
+                </option>
+              ))}
             </select>
           </div>
         </div>

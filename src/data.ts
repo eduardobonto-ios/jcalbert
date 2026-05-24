@@ -27,3 +27,28 @@ export async function fetchTours(): Promise<Tour[]> {
     activities: Array.isArray(payload.activities) ? payload.activities : [],
   });
 }
+
+export async function fetchLocations(): Promise<string[]> {
+  try {
+    const response = await fetch(getApiUrl('/api/locations'));
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Locations API request failed (${response.status}): ${
+          errorText ? errorText.replace(/\s+/g, ' ').trim() : response.statusText
+        }`
+      );
+    }
+
+    const payload = await response.json();
+    const locations = Array.isArray(payload?.locations)
+      ? payload.locations.filter((location: unknown): location is string => typeof location === 'string' && location.trim().length > 0)
+      : [];
+
+    return locations;
+  } catch (err) {
+    console.error('fetchLocations failed:', err instanceof Error ? err.message : err);
+    return [];
+  }
+}

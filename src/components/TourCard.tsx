@@ -32,11 +32,10 @@ export const TourCard: React.FC<TourCardProps> = ({ tour, allTours, searchParams
     setIsBookingModalOpen(true);
   };
 
-  const carouselImages = tour.images || [
-    tour.image || 'https://picsum.photos/seed/palawan/800/600', // Tour places fallback
-    'https://picsum.photos/seed/palawan-food/800/600', // Food
-    'https://picsum.photos/seed/palawan-hotel/800/600', // Accommodations
-  ];
+  const carouselImages: (string | { url: string; label: string })[] =
+    Array.isArray(tour.images) && tour.images.length > 0
+      ? tour.images
+      : [tour.image || 'https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?q=80&w=800&auto=format&fit=crop'];
 
   const nextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -60,9 +59,11 @@ export const TourCard: React.FC<TourCardProps> = ({ tour, allTours, searchParams
           <AnimatePresence mode="wait">
             <motion.img 
               key={currentImageIndex}
-              src={typeof carouselImages[currentImageIndex] === 'string' 
-                ? carouselImages[currentImageIndex] as string 
-                : (carouselImages[currentImageIndex] as { url: string }).url} 
+              src={
+                typeof carouselImages[currentImageIndex] === 'string'
+                  ? (carouselImages[currentImageIndex] as string)
+                  : ((carouselImages[currentImageIndex] as { url: string }).url || 'https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?q=80&w=800&auto=format&fit=crop')
+              }
               alt={`${tour.name} - image ${currentImageIndex + 1}`}
               initial={{ opacity: 0, scale: 1.1 }}
               animate={{ opacity: 1, scale: 1 }}

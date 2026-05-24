@@ -256,8 +256,8 @@ Thank you for booking with Jcalbert Travel & Tours Services!`;
                     </>
                   )}
                 </button>
-                <a 
-                  href="https://www.facebook.com/profile.php?id=61574076939792"
+                <a
+                  href="https://www.facebook.com/messages/t/581849845016944"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full bg-[#1F91C7] text-white py-3 rounded-xl font-bold hover:bg-[#174B69] transition-all flex items-center justify-center gap-2"

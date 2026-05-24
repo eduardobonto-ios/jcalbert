@@ -1,4 +1,4 @@
-export type Destination = 'El Nido' | 'Puerto Princesa' | 'Coron' | 'Port Barton';
+export type Destination = string;
 export type DestinationOrEmpty = Destination | '';
 
 export interface Tour {

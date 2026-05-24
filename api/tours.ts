@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_KEY, SUPABASE_URL } from '../src/lib/supabaseConfig';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
@@ -16,21 +15,35 @@ export default async function handler(req: any, res: any) {
   try {
     const [toursResult, imagesResult, highlightsResult, activitiesResult] = await Promise.all([
       supabase
+        .schema('jcalbert')
         .from('tours')
-        .select('id, name, location, description, price, original_price, is_best_seller'),
+        .select('*')
+        .order('created_at', { ascending: false }),
       supabase
+        .schema('jcalbert')
         .from('tour_images')
         .select('tour_id, image_url, label, sort_order')
         .order('sort_order', { ascending: true }),
       supabase
+        .schema('jcalbert')
         .from('tour_highlights')
         .select('tour_id, highlight, sort_order')
         .order('sort_order', { ascending: true }),
       supabase
+        .schema('jcalbert')
         .from('tour_activities')
         .select('tour_id, activity, sort_order')
         .order('sort_order', { ascending: true }),
     ]);
+
+    console.log('data:', toursResult.data);
+    console.log('error:', toursResult.error);
+    console.log('data:', imagesResult.data);
+    console.log('error:', imagesResult.error);
+    console.log('data:', highlightsResult.data);
+    console.log('error:', highlightsResult.error);
+    console.log('data:', activitiesResult.data);
+    console.log('error:', activitiesResult.error);
 
     const error =
       toursResult.error ||

@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_KEY, SUPABASE_URL } from '../src/lib/supabaseConfig';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -36,15 +35,21 @@ export default async function handler(req: any, res: any) {
   const bookingId = bookingIdInput || null;
 
   try {
-    const { error } = await supabase.from('messaging').insert([
-      {
-        customer_booking_id: bookingId,
-        full_name: fullName,
-        contact_email: contactEmail,
-        message,
-        created_at: new Date().toISOString(),
-      },
-    ]);
+    const { data, error } = await supabase
+      .schema('jcalbert')
+      .from('messaging')
+      .insert([
+        {
+          customer_booking_id: bookingId,
+          full_name: fullName,
+          contact_email: contactEmail,
+          message,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+    console.log('data:', data);
+    console.log('error:', error);
 
     if (error) {
       console.error('API /api/message Supabase error:', error);

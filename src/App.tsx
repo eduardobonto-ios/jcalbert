@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { SearchForm } from './components/SearchForm';
-import { fetchTours } from './data';
+import { fetchLocations, fetchTours } from './data';
 import { SearchParams, Tour } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Info, Compass, ChevronRight } from 'lucide-react';
@@ -19,6 +19,7 @@ export default function App() {
   const [externalError, setExternalError] = useState<string | null>(null);
   const [toursError, setToursError] = useState<string | null>(null);
   const [showMoreTours, setShowMoreTours] = useState(false);
+  const [destinations, setDestinations] = useState<string[]>([]);
 
   // Homepage tour logic
   const elNidoMainTours = React.useMemo(() => 
@@ -100,15 +101,19 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
 
-    const loadTours = async () => {
+    const loadInitialData = async () => {
       try {
         setIsToursLoading(true);
         setToursError(null);
-        const loadedTours = await fetchTours();
+        const [loadedTours, loadedLocations] = await Promise.all([
+          fetchTours(),
+          fetchLocations(),
+        ]);
 
         if (!isMounted) return;
 
         setAllTours(loadedTours);
+        setDestinations(loadedLocations);
       } catch (error) {
         if (!isMounted) return;
 
@@ -121,7 +126,7 @@ export default function App() {
       }
     };
 
-    loadTours();
+    loadInitialData();
 
     return () => {
       isMounted = false;
@@ -174,11 +179,13 @@ export default function App() {
 
       {/* Search Form Container */}
       <div className="px-4">
-        <SearchForm 
-          onSearch={handleSearch} 
+        <SearchForm
+          onSearch={handleSearch}
           onParamsChange={handleParamsChange}
-          externalError={externalError} 
+          externalError={externalError}
           initialDestination={currentParams?.destination}
+          destinations={destinations}
+          isLocationsLoading={isToursLoading}
         />
       </div>
 
@@ -199,15 +206,11 @@ export default function App() {
                   <div className="pt-4 border-t border-gray-100">
                     <p className="font-bold text-gray-800 mb-2">Top Destinations</p>
                     <ul className="space-y-2">
-                      <li className="flex items-center gap-2 hover:text-[#1F91C7] cursor-pointer">
-                        <MapPin size={14} /> El Nido
-                      </li>
-                      <li className="flex items-center gap-2 hover:text-[#1F91C7] cursor-pointer">
-                        <MapPin size={14} /> Coron
-                      </li>
-                      <li className="flex items-center gap-2 hover:text-[#1F91C7] cursor-pointer">
-                        <MapPin size={14} /> Puerto Princesa
-                      </li>
+                      {destinations.map((destinationName) => (
+                        <li key={destinationName} className="flex items-center gap-2 hover:text-[#1F91C7] cursor-pointer">
+                          <MapPin size={14} /> {destinationName}
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 </div>

@@ -1,10 +1,9 @@
 import nodemailer from 'nodemailer';
 import PDFDocument from 'pdfkit';
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_KEY, SUPABASE_URL } from '../src/lib/supabaseConfig';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -35,7 +34,12 @@ export default async function handler(req: any, res: any) {
       try {
         const numericBookingId = parseInt((bookingNumber || '').split('-')[1] || '0', 10) || Date.now();
         console.log('Attempting to save to Supabase:', { booking_id: numericBookingId, reservation_fee: reservationFee ?? 0 });
-        const { data, error } = await supabase.from('sales_report').insert([{ booking_id: numericBookingId, reservation_fee: reservationFee ?? 0, created_at: new Date().toISOString() }]);
+        const { data, error } = await supabase
+          .schema('jcalbert')
+          .from('sales_report')
+          .insert([{ booking_id: numericBookingId, reservation_fee: reservationFee ?? 0, total_amount: totalPrice ?? 0, created_at: new Date().toISOString() }]);
+        console.log('data:', data);
+        console.log('error:', error);
         if (error) {
           console.error('Supabase insert error:', error);
         } else {

@@ -12,8 +12,8 @@ interface TourRow {
 
 interface TourImageRow {
   tour_id: string;
-  image_url: string;
-  label: string;
+  image_url?: string | null;
+  label?: string | null;
   sort_order?: number | null;
 }
 
@@ -76,7 +76,9 @@ export const mapToursQueryResult = ({ tours, images, highlights, activities }: T
 
   return sortTours(
     tours.map((tourRow) => {
-      const orderedImages = sortByOrder(imagesByTourId.get(tourRow.id) ?? []);
+      const orderedImages = sortByOrder(imagesByTourId.get(tourRow.id) ?? []).filter(
+        (image) => typeof image.image_url === 'string' && image.image_url.trim().length > 0
+      );
       const orderedHighlights = sortByOrder(highlightsByTourId.get(tourRow.id) ?? []);
       const orderedActivities = sortByOrder(activitiesByTourId.get(tourRow.id) ?? []);
 
@@ -90,7 +92,7 @@ export const mapToursQueryResult = ({ tours, images, highlights, activities }: T
         image: orderedImages[0]?.image_url,
         images: orderedImages.map((image) => ({
           url: image.image_url,
-          label: image.label,
+          label: image.label ?? tourRow.name,
         })),
         highlights: orderedHighlights.map((highlight) => highlight.highlight),
         activities: orderedActivities.length ? orderedActivities.map((activity) => activity.activity) : undefined,
