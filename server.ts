@@ -22,6 +22,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_ANON_KEY ||
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhZXB1c3docHB0Y2FzcmlpZXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTA5NTcsImV4cCI6MjA4OTEyNjk1N30.9CuuxupRvvdV7MOY5lCfy9UtdVJtZwxFqbxsGNPM54g',
+  { db: { schema: 'jcalbert' } },
 );
 
 async function startServer() {
@@ -61,7 +62,6 @@ async function startServer() {
       }
 
       const { data, error } = await supabase
-        .schema('jcalbert')
         .from('messaging')
         .insert([
           {
@@ -110,22 +110,18 @@ async function startServer() {
     try {
       const [toursResult, imagesResult, highlightsResult, activitiesResult] = await Promise.all([
         supabase
-          .schema('jcalbert')
           .from('tours')
           .select('*')
           .order('created_at', { ascending: false }),
         supabase
-          .schema('jcalbert')
           .from('tour_images')
           .select('tour_id, image_url, label, sort_order')
           .order('sort_order', { ascending: true }),
         supabase
-          .schema('jcalbert')
           .from('tour_highlights')
           .select('tour_id, highlight, sort_order')
           .order('sort_order', { ascending: true }),
         supabase
-          .schema('jcalbert')
           .from('tour_activities')
           .select('tour_id, activity, sort_order')
           .order('sort_order', { ascending: true }),
@@ -185,7 +181,6 @@ async function startServer() {
 
     try {
       const { data, error } = await supabase
-        .schema('jcalbert')
         .from('reviews')
         .select('reviews_photo')
         .not('reviews_photo', 'is', null);
@@ -223,7 +218,6 @@ async function startServer() {
 
     try {
       const { data, error } = await supabase
-        .schema('jcalbert')
         .from('location')
         .select('location_name')
         .order('location_name', { ascending: true });
@@ -287,7 +281,6 @@ async function startServer() {
         const numericBookingId = parseInt((bookingNumber || '').split('-')[1] || '0', 10) || Date.now();
         
         const { data, error: supabaseError } = await supabase
-          .schema('jcalbert')
           .from('sales_report')
           .insert([
             {

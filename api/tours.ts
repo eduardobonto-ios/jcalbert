@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qaepuswhpptcasriieps.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhZXB1c3docHB0Y2FzcmlpZXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTA5NTcsImV4cCI6MjA4OTEyNjk1N30.9CuuxupRvvdV7MOY5lCfy9UtdVJtZwxFqbxsGNPM54g';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'jcalbert' } });
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
@@ -16,22 +16,18 @@ export default async function handler(req: any, res: any) {
   try {
     const [toursResult, imagesResult, highlightsResult, activitiesResult] = await Promise.all([
       supabase
-        .schema('jcalbert')
         .from('tours')
         .select('*')
         .order('created_at', { ascending: false }),
       supabase
-        .schema('jcalbert')
         .from('tour_images')
         .select('tour_id, image_url, label, sort_order')
         .order('sort_order', { ascending: true }),
       supabase
-        .schema('jcalbert')
         .from('tour_highlights')
         .select('tour_id, highlight, sort_order')
         .order('sort_order', { ascending: true }),
       supabase
-        .schema('jcalbert')
         .from('tour_activities')
         .select('tour_id, activity, sort_order')
         .order('sort_order', { ascending: true }),
