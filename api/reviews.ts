@@ -9,24 +9,22 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  if (!supabase) {
-    return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
-  }
-
   const { data, error } = await supabase
     .from('reviews')
-    .select('reviews_photo, reviewer_name, rating, review_text, created_at')
-    .not('reviews_photo', 'is', null)
-    .order('created_at', { ascending: false });
+    .select('reviews_photo')
+    .not('reviews_photo', 'is', null);
 
   console.log('Reviews data:', data);
   console.log('Reviews error:', error);
 
   if (error) {
+    console.error('Supabase reviews error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 
-  const reviews = (data ?? []).filter((row: any) => row.reviews_photo);
+  const photos = (data ?? [])
+    .map((row: { reviews_photo: string }) => row.reviews_photo)
+    .filter(Boolean);
 
-  return res.status(200).json({ success: true, reviews });
+  return res.status(200).json({ success: true, photos });
 }
