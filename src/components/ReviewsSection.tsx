@@ -4,6 +4,7 @@ import { Star } from 'lucide-react';
 import { getApiUrl } from '../lib/api';
 
 interface Review {
+  id: number;
   reviews_photo: string;
 }
 
@@ -17,10 +18,13 @@ const ReviewsSection: React.FC = () => {
     fetch(getApiUrl('/api/reviews'))
       .then((res) => res.json())
       .then((data) => {
-        console.log('Reviews API response success:', data.success);
-        console.log('Reviews count:', data.photos?.length);
-        if (mounted && data.success && Array.isArray(data.photos)) {
-          setReviews(data.photos.map((p: string) => ({ reviews_photo: p })));
+        console.log('Reviews API success:', data.success, '| count:', data.reviews?.length);
+        if (mounted && data.success && Array.isArray(data.reviews)) {
+          // DEBUG: log every review id and photo prefix
+          data.reviews.forEach((r: Review) => {
+            console.log(r.id, r.reviews_photo?.slice(0, 30));
+          });
+          setReviews(data.reviews);
         }
       })
       .catch((err) => console.error('Failed to load reviews:', err))
@@ -28,11 +32,6 @@ const ReviewsSection: React.FC = () => {
 
     return () => { mounted = false; };
   }, []);
-
-  // DEBUG: log first photo prefix
-  if (reviews.length > 0) {
-    console.log('reviews_photo[0] first 50 chars:', reviews[0].reviews_photo.slice(0, 50));
-  }
 
   return (
     <section className="py-16 bg-gray-50">
@@ -60,16 +59,20 @@ const ReviewsSection: React.FC = () => {
         ) : reviews.length === 0 ? (
           <p className="text-center text-gray-400 py-12">No reviews yet.</p>
         ) : (
-          // DEBUG: render only first image
+          // DEBUG: full loop, plain img, no lazy loading, no transforms
           <div>
-            <p className="text-xs text-gray-400 mb-2 text-center">
-              DEBUG — showing 1 of {reviews.length} reviews
+            <p className="text-xs text-gray-400 mb-4 text-center">
+              DEBUG — {reviews.length} reviews loaded
             </p>
-            <img
-              src={reviews[0].reviews_photo}
-              alt="review"
-              style={{ width: '300px' }}
-            />
+            {reviews.map((review) => (
+              <div key={review.id} style={{ marginBottom: 16 }}>
+                <img
+                  src={review.reviews_photo}
+                  alt={`Customer review ${review.id}`}
+                  style={{ width: 300, display: 'block' }}
+                />
+              </div>
+            ))}
           </div>
         )}
 

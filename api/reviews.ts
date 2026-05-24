@@ -11,10 +11,10 @@ export default async function handler(req: any, res: any) {
 
   const { data, error } = await supabase
     .from('reviews')
-    .select('reviews_photo')
+    .select('id, reviews_photo')
     .not('reviews_photo', 'is', null);
 
-  console.log('Reviews data:', data);
+  console.log('Reviews count:', data?.length);
   console.log('Reviews error:', error);
 
   if (error) {
@@ -22,9 +22,7 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ success: false, error: error.message });
   }
 
-  const photos = (data ?? [])
-    .map((row: { reviews_photo: string }) => row.reviews_photo)
-    .filter(Boolean);
+  const reviews = (data ?? []).filter((row: any) => row.reviews_photo);
 
-  return res.status(200).json({ success: true, photos });
+  return res.status(200).json({ success: true, reviews });
 }
