@@ -13,6 +13,11 @@ interface BookingModalProps {
 }
 
 export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, tour, allTours, searchParams }) => {
+  const today = React.useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [email, setEmail] = useState('');
@@ -122,6 +127,23 @@ Thank you for booking with Jcalbert Travel & Tours Services!`;
     e.preventDefault();
     setIsSending(true);
     setError(null);
+
+    // Date validation
+    if (searchParams?.checkIn && searchParams.checkIn < today) {
+      setError('Tour start date cannot be in the past.');
+      setIsSending(false);
+      return;
+    }
+    if (searchParams?.checkIn && searchParams?.checkOut && searchParams.checkOut < searchParams.checkIn) {
+      setError('Tour end date must be later than start date.');
+      setIsSending(false);
+      return;
+    }
+    if (!isFlightNA && arrivalDate && departureDate && departureDate < arrivalDate) {
+      setError('Departure date must be on or after arrival date.');
+      setIsSending(false);
+      return;
+    }
 
     // Validate Guest List: If name is provided, age is required
     const invalidGuest = guestList.find(g => g.name.trim() !== '' && g.age.trim() === '');
@@ -429,10 +451,11 @@ Thank you for booking with Jcalbert Travel & Tours Services!`;
                         <div className="grid grid-cols-[1fr_1.5fr] gap-2">
                           <div className="space-y-1">
                             <p className="text-[10px] font-bold text-gray-400 uppercase">Arrival Date</p>
-                            <input 
+                            <input
                               required={!isFlightNA}
                               type="date"
                               value={arrivalDate}
+                              min={today}
                               onChange={(e) => setArrivalDate(e.target.value)}
                               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#1F91C7] outline-none text-xs"
                             />
@@ -451,10 +474,11 @@ Thank you for booking with Jcalbert Travel & Tours Services!`;
                         <div className="grid grid-cols-[1fr_1.5fr] gap-2">
                           <div className="space-y-1">
                             <p className="text-[10px] font-bold text-gray-400 uppercase">Departure Date</p>
-                            <input 
+                            <input
                               required={!isFlightNA}
                               type="date"
                               value={departureDate}
+                              min={arrivalDate || today}
                               onChange={(e) => setDepartureDate(e.target.value)}
                               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#1F91C7] outline-none text-xs"
                             />
@@ -499,10 +523,11 @@ Thank you for booking with Jcalbert Travel & Tours Services!`;
                           </div>
                           <div className="flex items-center gap-2">
                             <Calendar size={14} className="text-gray-400" />
-                            <input 
+                            <input
                               required
                               type="date"
                               value={at.date}
+                              min={today}
                               onChange={(e) => handleUpdateTourDate(at.id, e.target.value)}
                               className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-[#1F91C7]"
                             />

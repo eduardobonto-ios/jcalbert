@@ -20,6 +20,11 @@ export const SearchForm: React.FC<SearchFormProps> = ({
   destinations = [],
   isLocationsLoading = false,
 }) => {
+  const today = React.useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+
   const [destination, setDestination] = useState<DestinationOrEmpty>(initialDestination);
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
@@ -71,19 +76,35 @@ export const SearchForm: React.FC<SearchFormProps> = ({
     }
   }, [destination, checkIn, checkOut, adults, children, onParamsChange, onSearch]);
 
+  const handleCheckInChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newCheckIn = e.target.value;
+    setCheckIn(newCheckIn);
+    // Auto-clear checkOut if it's now before the new checkIn
+    if (checkOut && newCheckIn && checkOut < newCheckIn) {
+      setCheckOut('');
+    }
+  };
+
   useEffect(() => {
-    if (checkIn && checkOut && new Date(checkIn) > new Date(checkOut)) {
-      setError('Tour date from: cannot be greater than Tour date to:');
+    if (checkIn && checkOut && checkOut < checkIn) {
+      setError('Tour end date must be later than start date.');
+    } else if (checkIn && checkIn < today) {
+      setError('Tour start date cannot be in the past.');
     } else {
       setError(null);
     }
-  }, [checkIn, checkOut]);
+  }, [checkIn, checkOut, today]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (checkIn && checkOut && new Date(checkIn) > new Date(checkOut)) {
-      setError('Tour date from: cannot be greater than Tour date to:');
+
+    if (checkIn && checkIn < today) {
+      setError('Tour start date cannot be in the past.');
+      return;
+    }
+
+    if (checkIn && checkOut && checkOut < checkIn) {
+      setError('Tour end date must be later than start date.');
       return;
     }
 
@@ -145,10 +166,11 @@ export const SearchForm: React.FC<SearchFormProps> = ({
             <Calendar className={cn("mr-3 shrink-0", displayError && !checkIn ? "text-red-400" : "text-gray-400")} size={24} />
             <div className="flex-1">
               <label className={cn("block text-[10px] font-bold uppercase tracking-wider", displayError && !checkIn ? "text-red-500" : "text-gray-400")}>Tour date from:</label>
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={checkIn}
-                onChange={(e) => setCheckIn(e.target.value)}
+                min={today}
+                onChange={handleCheckInChange}
                 className="w-full bg-transparent font-bold text-lg text-gray-800 focus:outline-none cursor-pointer"
               />
             </div>
@@ -160,9 +182,10 @@ export const SearchForm: React.FC<SearchFormProps> = ({
             <Calendar className={cn("mr-3 shrink-0", displayError && !checkOut ? "text-red-400" : "text-gray-400")} size={24} />
             <div className="flex-1">
               <label className={cn("block text-[10px] font-bold uppercase tracking-wider", displayError && !checkOut ? "text-red-500" : "text-gray-400")}>Tour date to:</label>
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={checkOut}
+                min={checkIn || today}
                 onChange={(e) => setCheckOut(e.target.value)}
                 className="w-full bg-transparent font-bold text-lg text-gray-800 focus:outline-none cursor-pointer"
               />

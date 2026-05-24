@@ -17,6 +17,16 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ success: false, error: 'bookingData is required' });
   }
 
+  // Backend date validation
+  const { searchParams: sp } = bookingData;
+  const serverToday = new Date().toISOString().split('T')[0];
+  if (sp?.checkIn && sp.checkIn < serverToday) {
+    return res.status(400).json({ success: false, error: 'Tour start date cannot be in the past.' });
+  }
+  if (sp?.checkIn && sp?.checkOut && sp.checkOut < sp.checkIn) {
+    return res.status(400).json({ success: false, error: 'Tour end date must be later than start date.' });
+  }
+
   try {
     const {
       bookingNumber,

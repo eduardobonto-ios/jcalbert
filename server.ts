@@ -182,8 +182,12 @@ async function startServer() {
     try {
       const { data, error } = await supabase
         .from('reviews')
-        .select('reviews_photo')
-        .not('reviews_photo', 'is', null);
+        .select('reviews_photo, reviewer_name, rating, review_text, created_at')
+        .not('reviews_photo', 'is', null)
+        .order('created_at', { ascending: false });
+
+      console.log('Reviews data:', data);
+      console.log('Reviews error:', error);
 
       if (error) {
         console.error('Supabase reviews query error:', error);
@@ -195,11 +199,9 @@ async function startServer() {
         });
       }
 
-      const photos = (data ?? [])
-        .map((row: { reviews_photo: string }) => row.reviews_photo)
-        .filter(Boolean);
+      const reviews = (data ?? []).filter((row: { reviews_photo: string }) => row.reviews_photo);
 
-      return res.json({ success: true, photos });
+      return res.json({ success: true, reviews });
     } catch (error) {
       console.error('Unexpected /api/reviews error:', error);
       return res.status(500).json({

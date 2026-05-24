@@ -15,16 +15,18 @@ export default async function handler(req: any, res: any) {
 
   const { data, error } = await supabase
     .from('reviews')
-    .select('reviews_photo')
-    .not('reviews_photo', 'is', null);
+    .select('reviews_photo, reviewer_name, rating, review_text, created_at')
+    .not('reviews_photo', 'is', null)
+    .order('created_at', { ascending: false });
+
+  console.log('Reviews data:', data);
+  console.log('Reviews error:', error);
 
   if (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
 
-  const photos = (data ?? [])
-    .map((row: { reviews_photo: string }) => row.reviews_photo)
-    .filter(Boolean);
+  const reviews = (data ?? []).filter((row: any) => row.reviews_photo);
 
-  return res.status(200).json({ photos });
+  return res.status(200).json({ success: true, reviews });
 }
