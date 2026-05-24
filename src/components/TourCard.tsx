@@ -35,7 +35,7 @@ export const TourCard: React.FC<TourCardProps> = ({ tour, allTours, searchParams
   const carouselImages: (string | { url: string; label: string })[] =
     Array.isArray(tour.images) && tour.images.length > 0
       ? tour.images
-      : [tour.image || 'https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?q=80&w=800&auto=format&fit=crop'];
+      : [tour.image || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=800&auto=format&fit=crop'];
 
   const nextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -62,7 +62,7 @@ export const TourCard: React.FC<TourCardProps> = ({ tour, allTours, searchParams
               src={
                 typeof carouselImages[currentImageIndex] === 'string'
                   ? (carouselImages[currentImageIndex] as string)
-                  : ((carouselImages[currentImageIndex] as { url: string }).url || 'https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?q=80&w=800&auto=format&fit=crop')
+                  : ((carouselImages[currentImageIndex] as { url: string }).url || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=800&auto=format&fit=crop')
               }
               alt={`${tour.name} - image ${currentImageIndex + 1}`}
               initial={{ opacity: 0, scale: 1.1 }}
