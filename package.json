@@ -2,7 +2,6 @@
   "name": "jcalbert",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
@@ -16,7 +15,6 @@
     "@tailwindcss/vite": "^4.1.14",
     "@types/pdfkit": "^0.17.5",
     "@vitejs/plugin-react": "^5.0.4",
-    "canvas": "^3.2.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.6",
     "date-fns": "^4.1.0",

@@ -178,6 +178,44 @@ async function startServer() {
     }
   });
 
+  app.get('/api/reviews', async (_req, res) => {
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
+    }
+
+    try {
+      const { data, error } = await supabase
+        .schema('jcalbert')
+        .from('reviews')
+        .select('reviews_photo')
+        .not('reviews_photo', 'is', null);
+
+      if (error) {
+        console.error('Supabase reviews query error:', error);
+        return res.status(500).json({
+          success: false,
+          error: process.env.NODE_ENV === 'production'
+            ? 'We could not load reviews right now. Please try again.'
+            : error.message,
+        });
+      }
+
+      const photos = (data ?? [])
+        .map((row: { reviews_photo: string }) => row.reviews_photo)
+        .filter(Boolean);
+
+      return res.json({ success: true, photos });
+    } catch (error) {
+      console.error('Unexpected /api/reviews error:', error);
+      return res.status(500).json({
+        success: false,
+        error: process.env.NODE_ENV === 'production'
+          ? 'We could not load reviews right now. Please try again.'
+          : error instanceof Error ? error.message : 'Server error',
+      });
+    }
+  });
+
   app.get('/api/locations', async (_req, res) => {
     if (!supabase) {
       return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
