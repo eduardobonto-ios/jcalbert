@@ -1,0 +1,3 @@
+-- tour_images_2 is now the sole image field in jcalbert.tour_images.
+-- image_url has been removed from the table.
+-- No migration needed: data should already exist in tour_images_2.

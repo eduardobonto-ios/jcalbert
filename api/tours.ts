@@ -21,7 +21,7 @@ export default async function handler(req: any, res: any) {
         .order('created_at', { ascending: false }),
       supabase
         .from('tour_images')
-        .select('tour_id, image_url, label, sort_order')
+        .select('tour_id, tours_images_2, label, sort_order')
         .order('sort_order', { ascending: true }),
       supabase
         .from('tour_highlights')
