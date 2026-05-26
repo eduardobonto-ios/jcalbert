@@ -4,7 +4,7 @@ import { SearchForm } from './components/SearchForm';
 import { fetchLocations, fetchTours } from './data';
 import { SearchParams, Tour } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Info, Compass, ChevronRight } from 'lucide-react';
+import { MapPin, Info, Compass } from 'lucide-react';
 import { TourCard } from './components/TourCard';
 import { AIChatbot } from './components/AIChatbot';
 import ReviewsSection from './components/ReviewsSection';
@@ -18,27 +18,9 @@ export default function App() {
   const [currentParams, setCurrentParams] = useState<SearchParams | null>(null);
   const [externalError, setExternalError] = useState<string | null>(null);
   const [toursError, setToursError] = useState<string | null>(null);
-  const [showMoreTours, setShowMoreTours] = useState(false);
   const [destinations, setDestinations] = useState<string[]>([]);
 
-  // Homepage tour logic
-  const elNidoMainTours = React.useMemo(() => 
-    allTours.filter(t => 
-      t.location === 'El Nido' && 
-      /Tour [A-D]/i.test(t.name)
-    ), [allTours]);
-
-  const otherTours = React.useMemo(() => 
-    allTours.filter(t => !elNidoMainTours.find(mt => mt.id === t.id))
-      .sort((a, b) => {
-        if (a.location === 'Puerto Princesa' && b.location !== 'Puerto Princesa') return -1;
-        if (a.location !== 'Puerto Princesa' && b.location === 'Puerto Princesa') return 1;
-        return 0;
-      }), [allTours, elNidoMainTours]);
-
-  const displayTours = hasSearched 
-    ? tours 
-    : (showMoreTours ? [...elNidoMainTours, ...otherTours] : elNidoMainTours);
+  const displayTours = hasSearched ? tours : allTours;
 
   const handleSearch = React.useCallback((params: SearchParams) => {
     if (!params.destination) {
@@ -73,7 +55,6 @@ export default function App() {
 
   const handleLogoClick = React.useCallback(() => {
     setHasSearched(false);
-    setShowMoreTours(false);
     setTours([]);
     setCurrentParams({
       destination: '',
@@ -88,7 +69,6 @@ export default function App() {
   // Initial featured content
   useEffect(() => {
     setHasSearched(false);
-    setShowMoreTours(false);
     setCurrentParams({
       destination: '',
       checkIn: '',
@@ -265,7 +245,7 @@ export default function App() {
                     <div className="flex items-center gap-2 border-l-4 border-[#F9B31C] pl-4">
                       <Compass className="text-[#F9B31C]" size={24} />
                       <h2 className="text-2xl font-bold text-gray-900">
-                        {hasSearched ? 'Search Results' : 'El Nido Tours'}
+                        {hasSearched ? 'Search Results' : 'All Tours'}
                       </h2>
                     </div>
                     <div className="grid grid-cols-1 gap-6">
@@ -281,23 +261,6 @@ export default function App() {
                       ))}
                     </div>
 
-                    {!hasSearched && !showMoreTours && (
-                      <div className="flex justify-center pt-8">
-                        <button 
-                          onClick={() => {
-                            setShowMoreTours(true);
-                            // Optional: smooth scroll a bit to show new content
-                            setTimeout(() => {
-                              window.scrollBy({ top: 300, behavior: 'smooth' });
-                            }, 100);
-                          }}
-                          className="bg-white border-2 border-[#1F91C7] text-[#174B69] px-8 py-3 rounded-xl font-bold hover:bg-[#E5F8FF] transition-all flex items-center gap-2 shadow-sm active:scale-95"
-                        >
-                          See more tours
-                          <ChevronRight size={20} />
-                        </button>
-                      </div>
-                    )}
                   </motion.div>
                 )}
 
