@@ -57,33 +57,37 @@ export const mapToursQueryResult = ({ tours, images, highlights, activities }: T
   const activitiesByTourId = new Map<string, TourActivityRow[]>();
 
   for (const image of images) {
-    const existing = imagesByTourId.get(image.tour_id) ?? [];
+    const key = String(image.tour_id);
+    const existing = imagesByTourId.get(key) ?? [];
     existing.push(image);
-    imagesByTourId.set(image.tour_id, existing);
+    imagesByTourId.set(key, existing);
   }
 
   for (const highlight of highlights) {
-    const existing = highlightsByTourId.get(highlight.tour_id) ?? [];
+    const key = String(highlight.tour_id);
+    const existing = highlightsByTourId.get(key) ?? [];
     existing.push(highlight);
-    highlightsByTourId.set(highlight.tour_id, existing);
+    highlightsByTourId.set(key, existing);
   }
 
   for (const activity of activities) {
-    const existing = activitiesByTourId.get(activity.tour_id) ?? [];
+    const key = String(activity.tour_id);
+    const existing = activitiesByTourId.get(key) ?? [];
     existing.push(activity);
-    activitiesByTourId.set(activity.tour_id, existing);
+    activitiesByTourId.set(key, existing);
   }
 
   return sortTours(
     tours.map((tourRow) => {
-      const orderedImages = sortByOrder(imagesByTourId.get(tourRow.id) ?? []).filter(
+      const id = String(tourRow.id);
+      const orderedImages = sortByOrder(imagesByTourId.get(id) ?? []).filter(
         (image) => typeof image.tours_images_2 === 'string' && image.tours_images_2.trim().length > 0
       );
-      const orderedHighlights = sortByOrder(highlightsByTourId.get(tourRow.id) ?? []);
-      const orderedActivities = sortByOrder(activitiesByTourId.get(tourRow.id) ?? []);
+      const orderedHighlights = sortByOrder(highlightsByTourId.get(id) ?? []);
+      const orderedActivities = sortByOrder(activitiesByTourId.get(id) ?? []);
 
       return {
-        id: tourRow.id,
+        id: String(tourRow.id),
         name: tourRow.name,
         location: tourRow.location,
         description: tourRow.description,
