@@ -452,9 +452,9 @@ async function startServer() {
           const summaryWidth = colWidths[2] + colWidths[3] + colWidths[4];
           const summaryX = margin + colWidths[0] + colWidths[1];
           
-          // New calculation for reservation fee: 400 per guest per tour package
+          // New calculation for reservation fee: 500 per guest per tour package
           const numberOfTours = 1 + additionalTours.length;
-          const calculatedReservationFee = 400 * totalGuests * numberOfTours;
+          const calculatedReservationFee = 500 * totalGuests * numberOfTours;
           const calculatedBalance = totalPrice - calculatedReservationFee;
 
           doc.font('Helvetica-Bold');

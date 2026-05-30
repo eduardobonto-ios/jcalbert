@@ -141,8 +141,8 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-4xl md:text-6xl font-extrabold text-white leading-tight drop-shadow-md"
               >
-                <span className="text-[#F9B31C]">Discover the Paradise with</span> <br className="hidden md:block" />
-                <span className="text-white">Jcalbert Travel & Tours Services</span>
+                <span className="text-[#F9B31C]">Your gateway to Palawan's most stunning destinations with</span> <br className="hidden md:block" />
+                <span className="text-white">Jcalbert Travel & Tours</span>
               </motion.h1>
               <motion.p 
                 initial={{ opacity: 0 }}
@@ -150,7 +150,7 @@ export default function App() {
                 transition={{ delay: 0.2 }}
                 className="mt-4 text-lg md:text-xl text-white font-medium max-w-2xl drop-shadow"
               >
-                Find the best deals on tours and activities in El Nido, Coron, and more.
+                Find the best deals in El Nido, Port Barton, Puerto Princesa & Coron.
               </motion.p>
             </div>
           </section>

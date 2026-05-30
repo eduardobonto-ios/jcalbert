@@ -206,7 +206,7 @@ export default async function handler(req: any, res: any) {
         const summaryX = margin + colWidths[0] + colWidths[1];
 
         const numberOfTours = 1 + (additionalTours?.length || 0);
-        const calculatedReservationFee = 400 * (totalGuests || 1) * numberOfTours;
+        const calculatedReservationFee = 500 * (totalGuests || 1) * numberOfTours;
         const calculatedBalance = (totalPrice || 0) - calculatedReservationFee;
 
         doc.font('Helvetica-Bold');

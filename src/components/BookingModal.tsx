@@ -120,7 +120,7 @@ Thank you for booking with Jcalbert Travel & Tours Services!`;
   const guestCount = 1 + guestList.filter(g => g.name.trim() !== '').length;
   const numberOfTours = 1 + additionalTours.length;
   const totalPrice = (tour.price + additionalTours.reduce((sum, t) => sum + t.price, 0)) * guestCount;
-  const reservationFee = guestCount * 400 * numberOfTours; 
+  const reservationFee = guestCount * 500 * numberOfTours;
   const balance = totalPrice - reservationFee;
 
   const handleSubmit = async (e: React.FormEvent) => {
