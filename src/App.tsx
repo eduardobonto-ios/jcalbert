@@ -121,7 +121,7 @@ export default function App() {
         <div 
           className="absolute inset-0 z-0"
           style={{
-            backgroundImage: 'url("/images/hero-bg.png")',
+            backgroundImage: 'url("/images/jcalbert_banner.png")',
             backgroundPosition: 'center',
             backgroundSize: 'cover',
           }}
