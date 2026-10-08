@@ -1,4 +1,4 @@
-import { getTours, PUBLIC_CACHE_HEADER } from './_lib/firestore';
+import { getTours, PUBLIC_CACHE_HEADER } from './_lib/firestore.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {

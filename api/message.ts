@@ -1,4 +1,4 @@
-import { addMessage } from './_lib/firestore';
+import { addMessage } from './_lib/firestore.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import PDFDocument from 'pdfkit';
-import { addSalesReport } from './_lib/firestore';
+import { addSalesReport } from './_lib/firestore.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
