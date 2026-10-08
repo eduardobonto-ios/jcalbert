@@ -1,6 +1,6 @@
 import { Tour } from './types';
 import { getApiUrl } from './lib/api';
-import { mapTourDocs } from './lib/tours';
+import { mapToursQueryResult } from './lib/tours';
 
 export async function fetchTours(): Promise<Tour[]> {
   const response = await fetch(getApiUrl('/api/tours'));
@@ -20,7 +20,12 @@ export async function fetchTours(): Promise<Tour[]> {
     throw new Error('Invalid tours payload received from API.');
   }
 
-  return mapTourDocs(payload.tours);
+  return mapToursQueryResult({
+    tours: payload.tours,
+    images: Array.isArray(payload.images) ? payload.images : [],
+    highlights: Array.isArray(payload.highlights) ? payload.highlights : [],
+    activities: Array.isArray(payload.activities) ? payload.activities : [],
+  });
 }
 
 export async function fetchLocations(): Promise<string[]> {

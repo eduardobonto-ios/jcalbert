@@ -1,8 +1,6 @@
 import { Tour, Destination } from '../types';
 
-// Shape of a Firestore "tours" document as returned by /api/tours.
-// Images, highlights and activities are embedded, already in display order.
-export interface TourDoc {
+interface TourRow {
   id: string;
   name: string;
   location: Destination;
@@ -10,10 +8,36 @@ export interface TourDoc {
   price: number | string;
   original_price?: number | string | null;
   is_best_seller?: boolean | null;
-  images?: { url?: string | null; label?: string | null }[];
-  highlights?: string[];
-  activities?: string[];
 }
+
+interface TourImageRow {
+  tour_id: string;
+  tours_images_2?: string | null;
+  label?: string | null;
+  sort_order?: number | null;
+}
+
+interface TourHighlightRow {
+  tour_id: string;
+  highlight: string;
+  sort_order?: number | null;
+}
+
+interface TourActivityRow {
+  tour_id: string;
+  activity: string;
+  sort_order?: number | null;
+}
+
+export interface ToursQueryResult {
+  tours: TourRow[];
+  images: TourImageRow[];
+  highlights: TourHighlightRow[];
+  activities: TourActivityRow[];
+}
+
+const sortByOrder = <T extends { sort_order?: number | null }>(items: T[]) =>
+  [...items].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
 export const sortTours = (tours: Tour[]) =>
   [...tours].sort((a, b) => {
@@ -27,27 +51,57 @@ export const sortTours = (tours: Tour[]) =>
     return aValue - bValue;
   });
 
-export const mapTourDocs = (tourDocs: TourDoc[]): Tour[] =>
-  sortTours(
-    tourDocs.map((tourDoc) => {
-      const images = (tourDoc.images ?? []).filter(
-        (image): image is { url: string; label?: string | null } =>
-          typeof image.url === 'string' && image.url.trim().length > 0
+export const mapToursQueryResult = ({ tours, images, highlights, activities }: ToursQueryResult): Tour[] => {
+  const imagesByTourId = new Map<string, TourImageRow[]>();
+  const highlightsByTourId = new Map<string, TourHighlightRow[]>();
+  const activitiesByTourId = new Map<string, TourActivityRow[]>();
+
+  for (const image of images) {
+    const key = String(image.tour_id);
+    const existing = imagesByTourId.get(key) ?? [];
+    existing.push(image);
+    imagesByTourId.set(key, existing);
+  }
+
+  for (const highlight of highlights) {
+    const key = String(highlight.tour_id);
+    const existing = highlightsByTourId.get(key) ?? [];
+    existing.push(highlight);
+    highlightsByTourId.set(key, existing);
+  }
+
+  for (const activity of activities) {
+    const key = String(activity.tour_id);
+    const existing = activitiesByTourId.get(key) ?? [];
+    existing.push(activity);
+    activitiesByTourId.set(key, existing);
+  }
+
+  return sortTours(
+    tours.map((tourRow) => {
+      const id = String(tourRow.id);
+      const orderedImages = sortByOrder(imagesByTourId.get(id) ?? []).filter(
+        (image) => typeof image.tours_images_2 === 'string' && image.tours_images_2.trim().length > 0
       );
-      const activities = tourDoc.activities ?? [];
+      const orderedHighlights = sortByOrder(highlightsByTourId.get(id) ?? []);
+      const orderedActivities = sortByOrder(activitiesByTourId.get(id) ?? []);
 
       return {
-        id: String(tourDoc.id),
-        name: tourDoc.name,
-        location: tourDoc.location,
-        description: tourDoc.description,
-        price: Number(tourDoc.price),
-        originalPrice: tourDoc.original_price == null ? undefined : Number(tourDoc.original_price),
-        image: images[0]?.url,
-        images: images.map((image) => ({ url: image.url, label: image.label ?? tourDoc.name })),
-        highlights: tourDoc.highlights ?? [],
-        activities: activities.length ? activities : undefined,
-        isBestSeller: Boolean(tourDoc.is_best_seller),
+        id: String(tourRow.id),
+        name: tourRow.name,
+        location: tourRow.location,
+        description: tourRow.description,
+        price: Number(tourRow.price),
+        originalPrice: tourRow.original_price == null ? undefined : Number(tourRow.original_price),
+        image: orderedImages[0]?.tours_images_2 ?? undefined,
+        images: orderedImages.map((image) => ({
+          url: image.tours_images_2 as string,
+          label: image.label ?? tourRow.name,
+        })),
+        highlights: orderedHighlights.map((highlight) => highlight.highlight),
+        activities: orderedActivities.length ? orderedActivities.map((activity) => activity.activity) : undefined,
+        isBestSeller: Boolean(tourRow.is_best_seller),
       };
     })
   );
+};

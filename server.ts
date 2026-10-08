@@ -6,13 +6,24 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import PDFDocument from 'pdfkit';
-import { addMessage, addSalesReport, getLocationNames, getReviews, getTours } from './api/_lib/firestore';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 dotenv.config({ path: '.env.local', override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Read env vars AFTER dotenv.config() so .env values are loaded.
+// supabaseConfig.ts constants are evaluated at import-time (before dotenv runs),
+// so we read process.env directly here to pick up the service role key.
+const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://qaepuswhpptcasriieps.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhZXB1c3docHB0Y2FzcmlpZXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTA5NTcsImV4cCI6MjA4OTEyNjk1N30.9CuuxupRvvdV7MOY5lCfy9UtdVJtZwxFqbxsGNPM54g',
+  { db: { schema: 'jcalbert' } },
+);
 
 async function startServer() {
   const app = express();
@@ -43,12 +54,38 @@ async function startServer() {
     const bookingId = bookingIdInput || null;
 
     try {
-      await addMessage({
-        customer_booking_id: bookingId,
-        full_name: fullName,
-        contact_email: contactEmail,
-        message,
-      });
+      if (!supabase) {
+        return res.status(500).json({
+          success: false,
+          error: 'Messaging is not configured on the server.',
+        });
+      }
+
+      const { data, error } = await supabase
+        .from('messaging')
+        .insert([
+          {
+            customer_booking_id: bookingId,
+            full_name: fullName,
+            contact_email: contactEmail,
+            message,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+
+      console.log('data:', data);
+      console.log('error:', error);
+
+      if (error) {
+        console.error('Supabase messaging insertion error:', error);
+        return res.status(500).json({
+          success: false,
+          error:
+            process.env.NODE_ENV === 'production'
+              ? 'We could not send your message right now. Please try again.'
+              : `Supabase error: ${error.message}`,
+        });
+      }
 
       return res.json({ success: true });
     } catch (error) {
@@ -66,8 +103,63 @@ async function startServer() {
   });
 
   app.get('/api/tours', async (_req, res) => {
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
+    }
+
     try {
-      return res.json({ success: true, tours: await getTours() });
+      const [toursResult, imagesResult, highlightsResult, activitiesResult] = await Promise.all([
+        supabase
+          .from('tours')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('tour_images')
+          .select('tour_id, tours_images_2, label, sort_order')
+          .order('sort_order', { ascending: true }),
+        supabase
+          .from('tour_highlights')
+          .select('tour_id, highlight, sort_order')
+          .order('sort_order', { ascending: true }),
+        supabase
+          .from('tour_activities')
+          .select('tour_id, activity, sort_order')
+          .order('sort_order', { ascending: true }),
+      ]);
+
+      console.log('data:', toursResult.data);
+      console.log('error:', toursResult.error);
+      console.log('data:', imagesResult.data);
+      console.log('error:', imagesResult.error);
+      console.log('data:', highlightsResult.data);
+      console.log('error:', highlightsResult.error);
+      console.log('data:', activitiesResult.data);
+      console.log('error:', activitiesResult.error);
+
+      const error =
+        toursResult.error ||
+        imagesResult.error ||
+        highlightsResult.error ||
+        activitiesResult.error;
+
+      if (error) {
+        console.error('Supabase tours query error:', error);
+        return res.status(500).json({
+          success: false,
+          error:
+            process.env.NODE_ENV === 'production'
+              ? 'We could not load tours right now. Please try again.'
+              : error.message,
+        });
+      }
+
+      return res.json({
+        success: true,
+        tours: toursResult.data ?? [],
+        images: imagesResult.data ?? [],
+        highlights: highlightsResult.data ?? [],
+        activities: activitiesResult.data ?? [],
+      });
     } catch (error) {
       console.error('Unexpected /api/tours error:', error);
       return res.status(500).json({
@@ -83,8 +175,32 @@ async function startServer() {
   });
 
   app.get('/api/reviews', async (_req, res) => {
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
+    }
+
     try {
-      return res.json({ success: true, reviews: await getReviews() });
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('id, reviews_photo')
+        .not('reviews_photo', 'is', null);
+
+      console.log('Reviews count:', data?.length);
+      console.log('Reviews error:', error);
+
+      if (error) {
+        console.error('Supabase reviews query error:', error);
+        return res.status(500).json({
+          success: false,
+          error: process.env.NODE_ENV === 'production'
+            ? 'We could not load reviews right now. Please try again.'
+            : error.message,
+        });
+      }
+
+      const reviews = (data ?? []).filter((row: { id: number; reviews_photo: string }) => row.reviews_photo);
+
+      return res.json({ success: true, reviews });
     } catch (error) {
       console.error('Unexpected /api/reviews error:', error);
       return res.status(500).json({
@@ -97,8 +213,34 @@ async function startServer() {
   });
 
   app.get('/api/locations', async (_req, res) => {
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
+    }
+
     try {
-      return res.json({ success: true, locations: await getLocationNames() });
+      const { data, error } = await supabase
+        .from('location')
+        .select('location_name')
+        .order('location_name', { ascending: true });
+
+      console.log('data:', data);
+      console.log('error:', error);
+
+      if (error) {
+        console.error('Supabase locations query error:', error);
+        return res.status(500).json({
+          success: false,
+          error:
+            process.env.NODE_ENV === 'production'
+              ? 'We could not load destinations right now. Please try again.'
+              : error.message,
+        });
+      }
+
+      return res.json({
+        success: true,
+        locations: (data ?? []).map((location) => location.location_name).filter(Boolean),
+      });
     } catch (error) {
       console.error('Unexpected /api/locations error:', error);
       return res.status(500).json({
@@ -134,14 +276,30 @@ async function startServer() {
     } = bookingData;
 
     try {
-      // Record the reservation in Firestore (non-fatal if it fails)
-      try {
+      // Send to Supabase
+      if (supabase) {
         // Extract the numeric part from 'JCA-12345678'
         const numericBookingId = parseInt((bookingNumber || '').split('-')[1] || '0', 10) || Date.now();
-        await addSalesReport({ booking_id: numericBookingId, reservation_fee: reservationFee ?? 0, total_amount: totalPrice ?? 0 });
-        console.log('Successfully recorded reservation fee in Firestore');
-      } catch (firestoreError) {
-        console.error('Firestore sales_report insertion error:', firestoreError);
+        
+        const { data, error: supabaseError } = await supabase
+          .from('sales_report')
+          .insert([
+            {
+              booking_id: numericBookingId,
+              reservation_fee: reservationFee,
+              total_amount: totalPrice,
+              created_at: new Date().toISOString()
+            }
+          ]);
+
+        console.log('data:', data);
+        console.log('error:', supabaseError);
+        
+        if (supabaseError) {
+          console.error('Supabase insertion error:', supabaseError);
+        } else {
+          console.log('Successfully recorded reservation fee in Supabase');
+        }
       }
 
       console.log('Attempting to send email to:', customer.email);

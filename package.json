@@ -2,9 +2,7 @@
   "name": "jcalbert",
   "private": true,
   "version": "0.0.0",
-  "engines": {
-    "node": "24.x"
-  },
+  "engines": { "node": "24.x" },
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
@@ -14,6 +12,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
+    "@supabase/supabase-js": "^2.99.2",
     "@tailwindcss/vite": "^4.1.14",
     "@types/pdfkit": "^0.17.5",
     "@vitejs/plugin-react": "^5.0.4",
@@ -22,7 +21,6 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.3.1",
     "express": "^4.22.1",
-    "firebase-admin": "^13.10.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "nodemailer": "^8.0.2",
