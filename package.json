@@ -2,7 +2,10 @@
   "name": "jcalbert",
   "private": true,
   "version": "0.0.0",
-  "engines": { "node": "22.x" },
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
