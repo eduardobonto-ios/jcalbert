@@ -1,71 +1,66 @@
-import { createClient } from '@supabase/supabase-js';
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qaepuswhpptcasriieps.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhZXB1c3docHB0Y2FzcmlpZXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTA5NTcsImV4cCI6MjA4OTEyNjk1N30.9CuuxupRvvdV7MOY5lCfy9UtdVJtZwxFqbxsGNPM54g';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'jcalbert' } });
+// FIREBASE_SERVICE_ACCOUNT holds the full service-account JSON (set in Vercel env vars).
+const getDb = () => {
+  if (!getApps().length) {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!serviceAccount) throw new Error('FIREBASE_SERVICE_ACCOUNT is not set.');
+    initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
+    getFirestore().settings({ preferRest: true });
+  }
+  return getFirestore();
+};
+
+// Serve Cloudinary photos resized and in the lightest format each browser supports.
+const optimizeImageUrl = (url: string) =>
+  url.includes('res.cloudinary.com')
+    ? url.replace('/image/upload/', '/image/upload/f_auto,q_auto,c_limit,w_1600/')
+    : url;
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  if (!supabase) {
-    return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
-  }
-
   try {
-    const [toursResult, imagesResult, highlightsResult, activitiesResult] = await Promise.all([
-      supabase
-        .from('tours')
-        .select('*')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('tour_images')
-        .select('tour_id, tours_images_2, label, sort_order')
-        .order('sort_order', { ascending: true }),
-      supabase
-        .from('tour_highlights')
-        .select('tour_id, highlight, sort_order')
-        .order('sort_order', { ascending: true }),
-      supabase
-        .from('tour_activities')
-        .select('tour_id, activity, sort_order')
-        .order('sort_order', { ascending: true }),
-    ]);
+    const snapshot = await getDb().collection('tours').get();
 
-    console.log('data:', toursResult.data);
-    console.log('error:', toursResult.error);
-    console.log('data:', imagesResult.data);
-    console.log('error:', imagesResult.error);
-    console.log('data:', highlightsResult.data);
-    console.log('error:', highlightsResult.error);
-    console.log('data:', activitiesResult.data);
-    console.log('error:', activitiesResult.error);
+    // Each tour document holds its images, highlights and activities; flatten them back
+    // into the row lists the frontend (src/lib/tours.ts) already expects.
+    const tours: Record<string, unknown>[] = [];
+    const images: Record<string, unknown>[] = [];
+    const highlights: Record<string, unknown>[] = [];
+    const activities: Record<string, unknown>[] = [];
 
-    const error =
-      toursResult.error ||
-      imagesResult.error ||
-      highlightsResult.error ||
-      activitiesResult.error;
+    for (const doc of snapshot.docs) {
+      const {
+        images: tourImages = [],
+        highlights: tourHighlights = [],
+        activities: tourActivities = [],
+        ...tour
+      } = doc.data();
 
-    if (error) {
-      console.error('Supabase tours query error:', error);
-      return res.status(500).json({
-        success: false,
-        error:
-          process.env.NODE_ENV === 'production'
-            ? 'We could not load tours right now. Please try again.'
-            : error.message,
+      tours.push({ id: doc.id, ...tour });
+      tourImages.forEach((image: { url: string; label?: string }, index: number) => {
+        images.push({
+          tour_id: doc.id,
+          tours_images_2: optimizeImageUrl(image.url),
+          label: image.label ?? '',
+          sort_order: index + 1,
+        });
+      });
+      tourHighlights.forEach((highlight: string, index: number) => {
+        highlights.push({ tour_id: doc.id, highlight, sort_order: index + 1 });
+      });
+      tourActivities.forEach((activity: string, index: number) => {
+        activities.push({ tour_id: doc.id, activity, sort_order: index + 1 });
       });
     }
 
-    return res.status(200).json({
-      success: true,
-      tours: toursResult.data ?? [],
-      images: imagesResult.data ?? [],
-      highlights: highlightsResult.data ?? [],
-      activities: activitiesResult.data ?? [],
-    });
+    // Let Vercel's CDN answer repeat visits for 5 minutes so most page loads never reach Firestore.
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
+    return res.status(200).json({ success: true, tours, images, highlights, activities });
   } catch (error) {
     console.error('Unexpected /api/tours error:', error);
     return res.status(500).json({

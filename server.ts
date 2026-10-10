@@ -6,7 +6,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import PDFDocument from 'pdfkit';
-import { createClient } from '@supabase/supabase-js';
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 dotenv.config();
 dotenv.config({ path: '.env.local', override: true });
@@ -14,16 +15,23 @@ dotenv.config({ path: '.env.local', override: true });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Read env vars AFTER dotenv.config() so .env values are loaded.
-// supabaseConfig.ts constants are evaluated at import-time (before dotenv runs),
-// so we read process.env directly here to pick up the service role key.
-const supabase = createClient(
-  process.env.SUPABASE_URL || 'https://qaepuswhpptcasriieps.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhZXB1c3docHB0Y2FzcmlpZXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTA5NTcsImV4cCI6MjA4OTEyNjk1N30.9CuuxupRvvdV7MOY5lCfy9UtdVJtZwxFqbxsGNPM54g',
-  { db: { schema: 'jcalbert' } },
-);
+// FIREBASE_SERVICE_ACCOUNT holds the full service-account JSON (put it in .env.local).
+// Read lazily so the dotenv values above are already loaded.
+const getDb = () => {
+  if (!getApps().length) {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!serviceAccount) throw new Error('FIREBASE_SERVICE_ACCOUNT is not set.');
+    initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
+    getFirestore().settings({ preferRest: true });
+  }
+  return getFirestore();
+};
+
+// Serve Cloudinary photos resized and in the lightest format each browser supports.
+const optimizeImageUrl = (url: string, width: number) =>
+  url.includes('res.cloudinary.com')
+    ? url.replace('/image/upload/', `/image/upload/f_auto,q_auto,c_limit,w_${width}/`)
+    : url;
 
 async function startServer() {
   const app = express();
@@ -54,38 +62,13 @@ async function startServer() {
     const bookingId = bookingIdInput || null;
 
     try {
-      if (!supabase) {
-        return res.status(500).json({
-          success: false,
-          error: 'Messaging is not configured on the server.',
-        });
-      }
-
-      const { data, error } = await supabase
-        .from('messaging')
-        .insert([
-          {
-            customer_booking_id: bookingId,
-            full_name: fullName,
-            contact_email: contactEmail,
-            message,
-            created_at: new Date().toISOString(),
-          },
-        ]);
-
-      console.log('data:', data);
-      console.log('error:', error);
-
-      if (error) {
-        console.error('Supabase messaging insertion error:', error);
-        return res.status(500).json({
-          success: false,
-          error:
-            process.env.NODE_ENV === 'production'
-              ? 'We could not send your message right now. Please try again.'
-              : `Supabase error: ${error.message}`,
-        });
-      }
+      await getDb().collection('messaging').add({
+        customer_booking_id: bookingId,
+        full_name: fullName,
+        contact_email: contactEmail,
+        message,
+        created_at: new Date().toISOString(),
+      });
 
       return res.json({ success: true });
     } catch (error) {
@@ -103,63 +86,42 @@ async function startServer() {
   });
 
   app.get('/api/tours', async (_req, res) => {
-    if (!supabase) {
-      return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
-    }
-
     try {
-      const [toursResult, imagesResult, highlightsResult, activitiesResult] = await Promise.all([
-        supabase
-          .from('tours')
-          .select('*')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('tour_images')
-          .select('tour_id, tours_images_2, label, sort_order')
-          .order('sort_order', { ascending: true }),
-        supabase
-          .from('tour_highlights')
-          .select('tour_id, highlight, sort_order')
-          .order('sort_order', { ascending: true }),
-        supabase
-          .from('tour_activities')
-          .select('tour_id, activity, sort_order')
-          .order('sort_order', { ascending: true }),
-      ]);
+      const snapshot = await getDb().collection('tours').get();
 
-      console.log('data:', toursResult.data);
-      console.log('error:', toursResult.error);
-      console.log('data:', imagesResult.data);
-      console.log('error:', imagesResult.error);
-      console.log('data:', highlightsResult.data);
-      console.log('error:', highlightsResult.error);
-      console.log('data:', activitiesResult.data);
-      console.log('error:', activitiesResult.error);
+      // Each tour document holds its images, highlights and activities; flatten them back
+      // into the row lists the frontend (src/lib/tours.ts) already expects.
+      const tours: Record<string, unknown>[] = [];
+      const images: Record<string, unknown>[] = [];
+      const highlights: Record<string, unknown>[] = [];
+      const activities: Record<string, unknown>[] = [];
 
-      const error =
-        toursResult.error ||
-        imagesResult.error ||
-        highlightsResult.error ||
-        activitiesResult.error;
+      for (const doc of snapshot.docs) {
+        const {
+          images: tourImages = [],
+          highlights: tourHighlights = [],
+          activities: tourActivities = [],
+          ...tour
+        } = doc.data();
 
-      if (error) {
-        console.error('Supabase tours query error:', error);
-        return res.status(500).json({
-          success: false,
-          error:
-            process.env.NODE_ENV === 'production'
-              ? 'We could not load tours right now. Please try again.'
-              : error.message,
+        tours.push({ id: doc.id, ...tour });
+        tourImages.forEach((image: { url: string; label?: string }, index: number) => {
+          images.push({
+            tour_id: doc.id,
+            tours_images_2: optimizeImageUrl(image.url, 1600),
+            label: image.label ?? '',
+            sort_order: index + 1,
+          });
+        });
+        tourHighlights.forEach((highlight: string, index: number) => {
+          highlights.push({ tour_id: doc.id, highlight, sort_order: index + 1 });
+        });
+        tourActivities.forEach((activity: string, index: number) => {
+          activities.push({ tour_id: doc.id, activity, sort_order: index + 1 });
         });
       }
 
-      return res.json({
-        success: true,
-        tours: toursResult.data ?? [],
-        images: imagesResult.data ?? [],
-        highlights: highlightsResult.data ?? [],
-        activities: activitiesResult.data ?? [],
-      });
+      return res.json({ success: true, tours, images, highlights, activities });
     } catch (error) {
       console.error('Unexpected /api/tours error:', error);
       return res.status(500).json({
@@ -175,30 +137,12 @@ async function startServer() {
   });
 
   app.get('/api/reviews', async (_req, res) => {
-    if (!supabase) {
-      return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
-    }
-
     try {
-      const { data, error } = await supabase
-        .from('reviews')
-        .select('id, reviews_photo')
-        .not('reviews_photo', 'is', null);
+      const snapshot = await getDb().collection('reviews').orderBy('created_at').get();
 
-      console.log('Reviews count:', data?.length);
-      console.log('Reviews error:', error);
-
-      if (error) {
-        console.error('Supabase reviews query error:', error);
-        return res.status(500).json({
-          success: false,
-          error: process.env.NODE_ENV === 'production'
-            ? 'We could not load reviews right now. Please try again.'
-            : error.message,
-        });
-      }
-
-      const reviews = (data ?? []).filter((row: { id: number; reviews_photo: string }) => row.reviews_photo);
+      const reviews = snapshot.docs
+        .filter((doc) => typeof doc.get('reviews_photo') === 'string' && doc.get('reviews_photo'))
+        .map((doc) => ({ id: doc.id, reviews_photo: optimizeImageUrl(doc.get('reviews_photo'), 1200) }));
 
       return res.json({ success: true, reviews });
     } catch (error) {
@@ -213,33 +157,12 @@ async function startServer() {
   });
 
   app.get('/api/locations', async (_req, res) => {
-    if (!supabase) {
-      return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
-    }
-
     try {
-      const { data, error } = await supabase
-        .from('location')
-        .select('location_name')
-        .order('location_name', { ascending: true });
-
-      console.log('data:', data);
-      console.log('error:', error);
-
-      if (error) {
-        console.error('Supabase locations query error:', error);
-        return res.status(500).json({
-          success: false,
-          error:
-            process.env.NODE_ENV === 'production'
-              ? 'We could not load destinations right now. Please try again.'
-              : error.message,
-        });
-      }
+      const snapshot = await getDb().collection('location').orderBy('location_name').get();
 
       return res.json({
         success: true,
-        locations: (data ?? []).map((location) => location.location_name).filter(Boolean),
+        locations: snapshot.docs.map((doc) => doc.get('location_name')).filter(Boolean),
       });
     } catch (error) {
       console.error('Unexpected /api/locations error:', error);
@@ -276,30 +199,20 @@ async function startServer() {
     } = bookingData;
 
     try {
-      // Send to Supabase
-      if (supabase) {
+      // Record the reservation fee; a failure here must not block the confirmation email.
+      try {
         // Extract the numeric part from 'JCA-12345678'
         const numericBookingId = parseInt((bookingNumber || '').split('-')[1] || '0', 10) || Date.now();
-        
-        const { data, error: supabaseError } = await supabase
-          .from('sales_report')
-          .insert([
-            {
-              booking_id: numericBookingId,
-              reservation_fee: reservationFee,
-              total_amount: totalPrice,
-              created_at: new Date().toISOString()
-            }
-          ]);
 
-        console.log('data:', data);
-        console.log('error:', supabaseError);
-        
-        if (supabaseError) {
-          console.error('Supabase insertion error:', supabaseError);
-        } else {
-          console.log('Successfully recorded reservation fee in Supabase');
-        }
+        await getDb().collection('sales_report').add({
+          booking_id: numericBookingId,
+          reservation_fee: reservationFee ?? 0,
+          total_amount: totalPrice ?? 0,
+          created_at: new Date().toISOString(),
+        });
+        console.log('Recorded booking in sales_report:', numericBookingId);
+      } catch (err) {
+        console.error('sales_report save failed:', err);
       }
 
       console.log('Attempting to send email to:', customer.email);

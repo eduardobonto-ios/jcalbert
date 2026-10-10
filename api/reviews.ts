@@ -1,28 +1,48 @@
-import { createClient } from '@supabase/supabase-js';
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qaepuswhpptcasriieps.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhZXB1c3docHB0Y2FzcmlpZXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTA5NTcsImV4cCI6MjA4OTEyNjk1N30.9CuuxupRvvdV7MOY5lCfy9UtdVJtZwxFqbxsGNPM54g';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'jcalbert' } });
+// FIREBASE_SERVICE_ACCOUNT holds the full service-account JSON (set in Vercel env vars).
+const getDb = () => {
+  if (!getApps().length) {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!serviceAccount) throw new Error('FIREBASE_SERVICE_ACCOUNT is not set.');
+    initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
+    getFirestore().settings({ preferRest: true });
+  }
+  return getFirestore();
+};
+
+// Serve Cloudinary photos resized and in the lightest format each browser supports.
+const optimizeImageUrl = (url: string) =>
+  url.includes('res.cloudinary.com')
+    ? url.replace('/image/upload/', '/image/upload/f_auto,q_auto,c_limit,w_1200/')
+    : url;
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  const { data, error } = await supabase
-    .from('reviews')
-    .select('id, reviews_photo')
-    .not('reviews_photo', 'is', null);
+  try {
+    const snapshot = await getDb().collection('reviews').orderBy('created_at').get();
 
-  console.log('Reviews count:', data?.length);
-  console.log('Reviews error:', error);
+    const reviews = snapshot.docs
+      .filter((doc) => typeof doc.get('reviews_photo') === 'string' && doc.get('reviews_photo'))
+      .map((doc) => ({ id: doc.id, reviews_photo: optimizeImageUrl(doc.get('reviews_photo')) }));
 
-  if (error) {
-    console.error('Supabase reviews error:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    // Let Vercel's CDN answer repeat visits for 5 minutes so most page loads never reach Firestore.
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
+    return res.status(200).json({ success: true, reviews });
+  } catch (error) {
+    console.error('Unexpected /api/reviews error:', error);
+    return res.status(500).json({
+      success: false,
+      error:
+        process.env.NODE_ENV === 'production'
+          ? 'We could not load reviews right now. Please try again.'
+          : error instanceof Error
+            ? error.message
+            : 'Server error',
+    });
   }
-
-  const reviews = (data ?? []).filter((row: any) => row.reviews_photo);
-
-  return res.status(200).json({ success: true, reviews });
 }

@@ -1,11 +1,18 @@
 import nodemailer from 'nodemailer';
 import PDFDocument from 'pdfkit';
-import { createClient } from '@supabase/supabase-js';
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qaepuswhpptcasriieps.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhZXB1c3docHB0Y2FzcmlpZXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTA5NTcsImV4cCI6MjA4OTEyNjk1N30.9CuuxupRvvdV7MOY5lCfy9UtdVJtZwxFqbxsGNPM54g';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'jcalbert' } });
+// FIREBASE_SERVICE_ACCOUNT holds the full service-account JSON (set in Vercel env vars).
+const getDb = () => {
+  if (!getApps().length) {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!serviceAccount) throw new Error('FIREBASE_SERVICE_ACCOUNT is not set.');
+    initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
+    getFirestore().settings({ preferRest: true });
+  }
+  return getFirestore();
+};
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -42,25 +49,14 @@ export default async function handler(req: any, res: any) {
       guestList = [],
     } = bookingData;
 
-    if (supabase) {
-      try {
-        const numericBookingId = parseInt((bookingNumber || '').split('-')[1] || '0', 10) || Date.now();
-        console.log('Attempting to save to Supabase:', { booking_id: numericBookingId, reservation_fee: reservationFee ?? 0 });
-        const { data, error } = await supabase
-          .from('sales_report')
-          .insert([{ booking_id: numericBookingId, reservation_fee: reservationFee ?? 0, total_amount: totalPrice ?? 0, created_at: new Date().toISOString() }]);
-        console.log('data:', data);
-        console.log('error:', error);
-        if (error) {
-          console.error('Supabase insert error:', error);
-        } else {
-          console.log('Supabase insert success:', data);
-        }
-      } catch (err) {
-        console.warn('Supabase save failed:', err);
-      }
-    } else {
-      console.warn('Supabase client not initialized - check env vars');
+    try {
+      const numericBookingId = parseInt((bookingNumber || '').split('-')[1] || '0', 10) || Date.now();
+      await getDb()
+        .collection('sales_report')
+        .add({ booking_id: numericBookingId, reservation_fee: reservationFee ?? 0, total_amount: totalPrice ?? 0, created_at: new Date().toISOString() });
+      console.log('Recorded booking in sales_report:', numericBookingId);
+    } catch (err) {
+      console.warn('sales_report save failed:', err);
     }
 
     // Do not fail if email credentials are absent; just return success.

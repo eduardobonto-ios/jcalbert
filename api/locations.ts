@@ -1,41 +1,30 @@
-import { createClient } from '@supabase/supabase-js';
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qaepuswhpptcasriieps.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhZXB1c3docHB0Y2FzcmlpZXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTA5NTcsImV4cCI6MjA4OTEyNjk1N30.9CuuxupRvvdV7MOY5lCfy9UtdVJtZwxFqbxsGNPM54g';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'jcalbert' } });
+// FIREBASE_SERVICE_ACCOUNT holds the full service-account JSON (set in Vercel env vars).
+const getDb = () => {
+  if (!getApps().length) {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!serviceAccount) throw new Error('FIREBASE_SERVICE_ACCOUNT is not set.');
+    initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
+    getFirestore().settings({ preferRest: true });
+  }
+  return getFirestore();
+};
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  if (!supabase) {
-    return res.status(500).json({ success: false, error: 'Supabase is not configured.' });
-  }
-
   try {
-    const { data, error } = await supabase
-      .from('location')
-      .select('location_name')
-      .order('location_name', { ascending: true });
+    const snapshot = await getDb().collection('location').orderBy('location_name').get();
 
-    console.log('data:', data);
-    console.log('error:', error);
-
-    if (error) {
-      console.error('Supabase locations query error:', error);
-      return res.status(500).json({
-        success: false,
-        error:
-          process.env.NODE_ENV === 'production'
-            ? 'We could not load destinations right now. Please try again.'
-            : error.message,
-      });
-    }
-
+    // Let Vercel's CDN answer repeat visits for 5 minutes so most page loads never reach Firestore.
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
     return res.status(200).json({
       success: true,
-      locations: (data ?? []).map((location) => location.location_name).filter(Boolean),
+      locations: snapshot.docs.map((doc) => doc.get('location_name')).filter(Boolean),
     });
   } catch (error) {
     console.error('Unexpected /api/locations error:', error);
